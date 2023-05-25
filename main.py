@@ -21,6 +21,9 @@ import torchvision.transforms as transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
 
+# 根据项目组织目录改变以下值
+path_tiny_imagenet_200 = '' #xxxx/xxxx/
+
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -140,6 +143,9 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.pretrained:
         print("=> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](pretrained=True)
+        # 修改最后一层的输出维度 
+        num_features = model.fc.in_features
+        model.fc = nn.Linear(num_features, 200)
     else:
         print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()
@@ -236,17 +242,44 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset = datasets.ImageFolder(
             traindir,
             transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
+                # transforms.RandomResizedCrop(224),
+                # transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
             ]))
+        
+        # 注意此段代码中的文件路径要与组合成项目后的路径符合，main.py与所要操作的文件的目录关系
+        # 读取 wnids.txt 文件中的标签列表
+        with open(path_tiny_imagenet_200+'wnids.txt', 'r') as f:
+            labels = [line.strip() for line in f.readlines()]
+
+        # 读取 val_annotations.txt 文件中的标签信息
+        with open(path_tiny_imagenet_200+'val/val_annotations.txt', 'r') as f:
+            val_annotations = [line.strip().split('\t') for line in f.readlines()]
+
+        # 将每个样本的标签修正为对应标签在列表中的索引
+        corrected_annotations = []
+        for annotation in val_annotations:
+            #print(annotation)
+            filename, label = annotation[0], annotation[1]
+            corrected_label = labels.index(label)
+            corrected_annotations.append((filename, corrected_label, annotation[2], annotation[3], annotation[4], annotation[5]))
+
+        # 将修正后的标签保存到新文件中
+        with open(path_tiny_imagenet_200+'val/val_annotations_new.txt', 'w') as f:
+            for annotation in corrected_annotations:
+                f.write('\t'.join([str(x) for x in annotation]) + '\n')
+
+        # 更改修改后的文件的名称为原来文件的名称
+        os.rename(path_tiny_imagenet_200+'val/val_annotations.txt', path_tiny_imagenet_200+'val/val_annotations_original.txt')
+        os.rename(path_tiny_imagenet_200+'val/val_annotations_new.txt', path_tiny_imagenet_200+'val/val_annotations.txt')
+
 
         val_dataset = datasets.ImageFolder(
             valdir,
             transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
+                # transforms.Resize(256),
+                # transforms.CenterCrop(224),
                 transforms.ToTensor(),
                 normalize,
             ]))
