@@ -23,7 +23,7 @@ from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter # 导入tensorboard写入器
 
 # 根据项目组织目录改变以下值
-path_tiny_imagenet_200 = '/data/bitahub/tiny-imagenet-200/' #xxxx/xxxx/
+path_tiny_imagenet_200 = '/data/yuanqs/Tiny-imagenet-200/' #xxxx/xxxx/
 # # 定义TensorBoard写入器
 writer = SummaryWriter(log_dir='/output/logs')
 
@@ -259,30 +259,30 @@ def main_worker(gpu, ngpus_per_node, args):
         
         # 注意此段代码中的文件路径要与组合成项目后的路径符合，main.py与所要操作的文件的目录关系
         # 读取 wnids.txt 文件中的标签列表
-        with open(path_tiny_imagenet_200+'wnids.txt', 'r') as f:
-            labels = [line.strip() for line in f.readlines()]
+        # with open(path_tiny_imagenet_200+'wnids.txt', 'r') as f:
+        #     labels = [line.strip() for line in f.readlines()]
 
-        # 读取 val_annotations.txt 文件中的标签信息
-        with open(path_tiny_imagenet_200+'val/val_annotations.txt', 'r') as f:
-            val_annotations = [line.strip().split('\t') for line in f.readlines()]
+        # # 读取 val_annotations.txt 文件中的标签信息
+        # with open(path_tiny_imagenet_200+'val/val_annotations.txt', 'r') as f:
+        #     val_annotations = [line.strip().split('\t') for line in f.readlines()]
 
-        # 将每个样本的标签修正为对应标签在列表中的索引
-        corrected_annotations = []
-        for annotation in val_annotations:
-            #print(annotation)
-            filename, label = annotation[0], annotation[1]
-            corrected_label = labels.index(label)
-            corrected_annotations.append((filename, corrected_label, annotation[2], annotation[3], annotation[4], annotation[5]))
+        # # 将每个样本的标签修正为对应标签在列表中的索引
+        # corrected_annotations = []
+        # for annotation in val_annotations:
+        #     #print(annotation)
+        #     filename, label = annotation[0], annotation[1]
+        #     corrected_label = labels.index(label)
+        #     corrected_annotations.append((filename, corrected_label, annotation[2], annotation[3], annotation[4], annotation[5]))
 
-        # 将修正后的标签保存到新文件中
-        with open(path_tiny_imagenet_200+'val/val_annotations_new.txt', 'w') as f:
-            for annotation in corrected_annotations:
-                f.write('\t'.join([str(x) for x in annotation]) + '\n')
+        # # 将修正后的标签保存到新文件中
+        # with open(path_tiny_imagenet_200+'val/val_annotations_new.txt', 'w') as f:
+        #     for annotation in corrected_annotations:
+        #         f.write('\t'.join([str(x) for x in annotation]) + '\n')
 
-        # 更改修改后的文件的名称为原来文件的名称
-        os.rename(path_tiny_imagenet_200+'val/val_annotations.txt', path_tiny_imagenet_200+'val/val_annotations_original.txt')
-        os.rename(path_tiny_imagenet_200+'val/val_annotations_new.txt', path_tiny_imagenet_200+'val/val_annotations.txt')
-
+        # # 更改修改后的文件的名称为原来文件的名称
+        # os.rename(path_tiny_imagenet_200+'val/val_annotations.txt', path_tiny_imagenet_200+'val/val_annotations_original.txt')
+        # os.rename(path_tiny_imagenet_200+'val/val_annotations_new.txt', path_tiny_imagenet_200+'val/val_annotations.txt')
+        # print("=> val labels have already been right")
 
         val_dataset = datasets.ImageFolder(
             valdir,
