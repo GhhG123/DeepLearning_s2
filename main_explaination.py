@@ -20,6 +20,13 @@ import torchvision.models as models  # 导入PyTorch的模型模块
 import torchvision.transforms as transforms  # 导入数据预处理模块
 from torch.optim.lr_scheduler import StepLR  # 导入学习率调整策略
 from torch.utils.data import Subset  # 导入数据子集模块
+from torch.utils.tensorboard import SummaryWriter # 导入tensorboard写入器
+
+# 根据项目组织目录改变以下值
+path_tiny_imagenet_200 = '/data/bitahub/tiny-imagenet-200/' #xxxx/xxxx/
+# # 定义TensorBoard写入器
+writer = SummaryWriter(log_dir='/output/logs')
+
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -137,9 +144,10 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.pretrained:
         print("=> using pre-trained model '{}'".format(args.arch))
         model = models.__dict__[args.arch](pretrained=True)  # 使用预训练模型
-        # # 修改最后一层的输出维度 #TODO:
-        # num_features = model.fc.in_features
-        # model.fc = nn.Linear(num_features, 200)
+        # # 修改最后一层的输出维度 
+        ##TO_DO:
+        num_features = model.fc.in_features
+        model.fc = nn.Linear(num_features, 200)
     else:
         print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()  # 创建新的模型
@@ -193,6 +201,12 @@ def main_worker(gpu, ngpus_per_node, args):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     scheduler = StepLR(optimizer, step_size=30, gamma=0.1)  # 设置学习率调度器，每30个epoch将学习率衰减10倍
 
+    # # 定义TensorBoard写入器
+    #
+
+    # 将模型写入TensorBoard
+    writer.add_graph(model, torch.zeros([1, 3, 64, 64]))
+
     # 可选地从检查点恢复训练-checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
@@ -218,7 +232,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 
 
 
-    # 加载数据 #TODO:
+    # 加载数据 #TO_DO:
     if args.dummy:  # 如果使用虚假数据
         print("=> Dummy data is used!")  # 打印提示信息
         # 创建虚假数据集
@@ -234,18 +248,46 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset = datasets.ImageFolder(
             traindir,
             transforms.Compose([
-                transforms.RandomResizedCrop(224),  # 随机裁剪
-                transforms.RandomHorizontalFlip(),  # 随机水平翻转
+                # transforms.RandomResizedCrop(224),  # 随机裁剪
+                # transforms.RandomHorizontalFlip(),  # 随机水平翻转
                 transforms.ToTensor(),  # 转换为张量
                 normalize,  # 归一化
             ]))
+        
+        #TO_DO:
+        # 注意此段代码中的文件路径要与组合成项目后的路径符合，main.py与所要操作的文件的目录关系
+        # 读取 wnids.txt 文件中的标签列表
+        with open(path_tiny_imagenet_200+'wnids.txt', 'r') as f:
+            labels = [line.strip() for line in f.readlines()]
+
+        # 读取 val_annotations.txt 文件中的标签信息
+        with open(path_tiny_imagenet_200+'val/val_annotations.txt', 'r') as f:
+            val_annotations = [line.strip().split('\t') for line in f.readlines()]
+
+        # 将每个样本的标签修正为对应标签在列表中的索引
+        corrected_annotations = []
+        for annotation in val_annotations:
+            #print(annotation)
+            filename, label = annotation[0], annotation[1]
+            corrected_label = labels.index(label)
+            corrected_annotations.append((filename, corrected_label, annotation[2], annotation[3], annotation[4], annotation[5]))
+
+        # 将修正后的标签保存到新文件中
+        with open(path_tiny_imagenet_200+'val/val_annotations_new.txt', 'w') as f:
+            for annotation in corrected_annotations:
+                f.write('\t'.join([str(x) for x in annotation]) + '\n')
+
+        # 更改修改后的文件的名称为原来文件的名称
+        os.rename(path_tiny_imagenet_200+'val/val_annotations.txt', path_tiny_imagenet_200+'val/val_annotations_original.txt')
+        os.rename(path_tiny_imagenet_200+'val/val_annotations_new.txt', path_tiny_imagenet_200+'val/val_annotations.txt')
+        print("=> val labels have already been right")
 
         # 验证集数据预处理
         val_dataset = datasets.ImageFolder(
             valdir,
             transforms.Compose([
-                transforms.Resize(256),  # 调整大小
-                transforms.CenterCrop(224),  # 中心裁剪
+                # transforms.Resize(256),  # 调整大小
+                # transforms.CenterCrop(224),  # 中心裁剪
                 transforms.ToTensor(),  # 转换为张量
                 normalize,  # 归一化
             ]))
@@ -339,6 +381,12 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
 
         if i % args.print_freq == 0:
             progress.display(i + 1)
+        
+        # 将训练集的Loss和精度写入TensorBoard
+        if i % args.print_freq == 0:
+            writer.add_scalar('Train/Loss', losses.avg, epoch * len(train_loader) + i)
+            writer.add_scalar('Train/Acc@1', top1.avg, epoch * len(train_loader) + i)
+            writer.add_scalar('Train/Acc@5', top5.avg, epoch * len(train_loader) + i)
 
 def validate(val_loader, model, criterion, args):
     # 定义一个名为run_validate的辅助函数，用于执行验证过程
@@ -367,6 +415,11 @@ def validate(val_loader, model, criterion, args):
                 losses.update(loss.item(), images.size(0))
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
+
+                # 将损失和准确率记录到 TensorBoard 中
+                writer.add_scalar('val_loss', loss.item(), i)
+                writer.add_scalar('val_acc1', acc1[0], i)
+                writer.add_scalar('val_acc5', acc5[0], i)
 
                 # 计算经过的时间
                 batch_time.update(time.time() - end)
@@ -414,7 +467,7 @@ def validate(val_loader, model, criterion, args):
 
     return top1  # 返回Top-1准确率
 
-#TODO:
+#TO_DO:
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     # 保存模型状态到文件
     torch.save(state, filename)
@@ -517,7 +570,7 @@ def accuracy(output, target, topk=(1,)):
         maxk = max(topk)  # topk中的最大值
         batch_size = target.size(0)  # 批次大小
 
-        #TODO:
+        #TO_DO:
         _, pred = output.topk(maxk, 1, True, True)  # 获取前k个预测结果
         pred = pred.t()  # 转置预测结果矩阵
         correct = pred.eq(target.view(1, -1).expand_as(pred))  # 比较预测结果和目标值是否相等
@@ -530,3 +583,4 @@ def accuracy(output, target, topk=(1,)):
 
 if __name__ == '__main__':
     main()
+    writer.close()

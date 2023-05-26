@@ -406,8 +406,9 @@ def validate(val_loader, model, criterion, args):
                 if args.gpu is not None and torch.cuda.is_available():
                     images = images.cuda(args.gpu, non_blocking=True)
                 # if torch.backends.mps.is_available():
-                images = images.to('mps')
-                target = target.to('mps')
+                # images = images.to('mps')
+                # target = target.to('mps')
+                 # move data to the same device as model
                 if torch.cuda.is_available():
                     target = target.cuda(args.gpu, non_blocking=True)
 
