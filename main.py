@@ -20,9 +20,12 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
+from torch.utils.tensorboard import SummaryWriter # 导入tensorboard写入器
 
 # 根据项目组织目录改变以下值
-path_tiny_imagenet_200 = '' #xxxx/xxxx/
+path_tiny_imagenet_200 = '/data/bitahub/tiny-imagenet-200/' #xxxx/xxxx/
+# # 定义TensorBoard写入器
+writer = SummaryWriter(log_dir='/output/logs')
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -203,6 +206,12 @@ def main_worker(gpu, ngpus_per_node, args):
     
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
+
+    # # 定义TensorBoard写入器
+    #
+
+    # 将模型写入TensorBoard
+    writer.add_graph(model, torch.zeros([1, 3, 64, 64]))
     
     # optionally resume from a checkpoint
     if args.resume:
@@ -376,6 +385,12 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
         if i % args.print_freq == 0:
             progress.display(i + 1)
 
+        # 将训练集的Loss和精度写入TensorBoard
+        if i % args.print_freq == 0:
+            writer.add_scalar('Train/Loss', losses.avg, epoch * len(train_loader) + i)
+            writer.add_scalar('Train/Acc@1', top1.avg, epoch * len(train_loader) + i)
+            writer.add_scalar('Train/Acc@5', top5.avg, epoch * len(train_loader) + i)
+
 
 def validate(val_loader, model, criterion, args):
 
@@ -401,6 +416,11 @@ def validate(val_loader, model, criterion, args):
                 losses.update(loss.item(), images.size(0))
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
+
+                # 将损失和准确率记录到 TensorBoard 中
+                writer.add_scalar('val_loss', loss.item(), i)
+                writer.add_scalar('val_acc1', acc1[0], i)
+                writer.add_scalar('val_acc5', acc5[0], i)
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
@@ -542,3 +562,4 @@ def accuracy(output, target, topk=(1,)):
 
 if __name__ == '__main__':
     main()
+    writer.close()
