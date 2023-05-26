@@ -180,6 +180,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif torch.backends.mps.is_available():
         device = torch.device("mps")
         model = model.to(device)
+        data = data.to(device)
     else:
         # DataParallel will divide and allocate batch_size to all available GPUs
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
@@ -209,9 +210,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # # 定义TensorBoard写入器
     #
-
+    
     # 将模型写入TensorBoard
-    writer.add_graph(model, torch.zeros([1, 3, 64, 64]))
+    # writer.add_graph(model, torch.zeros([1, 3, 64, 64]))
     
     # optionally resume from a checkpoint
     if args.resume:
@@ -353,6 +354,9 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
 
     # switch to train mode
     model.train()
+
+     # 将模型添加到TensorBoard
+    writer.add_graph(model, torch.zeros([1, 3, 64, 64]).to(device))
 
     end = time.time()
     for i, (images, target) in enumerate(train_loader):
