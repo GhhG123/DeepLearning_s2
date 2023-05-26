@@ -396,10 +396,10 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
             writer.add_scalar('Train/Acc@5', top5.avg, epoch * len(train_loader) + i)
         
         # 保存epoch=4、14
-        if args.evaluate and (epoch == 4 or epoch == 14):
-            state = {'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
+        if args.evaluate and (i == 4 or i == 14):
+            state = {'epoch': i, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
             #save_checkpoint(state, is_best=True, 
-            filename='/output/checkpoint_epoch'+str(epoch)+'.pth.tar'
+            filename='/output/checkpoints/checkpoint_epoch'+str(i)+'.pth.tar'
             torch.save(state, filename)
 
 def validate(val_loader, model, criterion, args):
@@ -469,7 +469,7 @@ def validate(val_loader, model, criterion, args):
 
     # 加载保存的checkpoint进行评估
     if args.evaluate:
-        checkpoint_paths = ['/output/checkpoint_epoch4.pth.tar', '/output/checkpoint_epoch14.pth.tar']
+        checkpoint_paths = ['/output/checkpoints/checkpoint_epoch4.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
         results = []
 
     for checkpoint_path in checkpoint_paths:
