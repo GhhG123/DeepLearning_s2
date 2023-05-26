@@ -23,7 +23,7 @@ from torch.utils.data import Subset
 from torch.utils.tensorboard import SummaryWriter # 导入tensorboard写入器
 
 # 根据项目组织目录改变以下值
-path_tiny_imagenet_200 = '/data/yuanqs/Tiny-imagenet-200/' #xxxx/xxxx/
+path_tiny_imagenet_200 = '/data/bitahub/Tiny-imagenet-200/' #xxxx/xxxx/
 # # 定义TensorBoard写入器
 writer = SummaryWriter(log_dir='/output/logs')
 
