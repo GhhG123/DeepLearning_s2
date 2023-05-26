@@ -394,6 +394,11 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
             writer.add_scalar('Train/Loss', losses.avg, epoch * len(train_loader) + i)
             writer.add_scalar('Train/Acc@1', top1.avg, epoch * len(train_loader) + i)
             writer.add_scalar('Train/Acc@5', top5.avg, epoch * len(train_loader) + i)
+        
+        # 保存epoch=4、14
+        if args.evaluate and (epoch == 4 or epoch == 14):
+            state = {'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
+            save_checkpoint(state, is_best=True, filename='checkpoint_epoch'+str(epoch)+'.pth.tar')
 
 
 def validate(val_loader, model, criterion, args):
@@ -460,6 +465,28 @@ def validate(val_loader, model, criterion, args):
         run_validate(aux_val_loader, len(val_loader))
 
     progress.display_summary()
+
+    # 加载保存的checkpoint进行评估
+    if args.evaluate:
+        checkpoint_paths = ['checkpoint_epoch4.pth.tar', 'checkpoint_epoch14.pth.tar']
+        results = []
+
+    for checkpoint_path in checkpoint_paths:
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['state_dict'])
+        # 在测试集上进行评估
+        result = validate(val_loader, model, criterion, args)
+        results.append(result)
+
+    # 对比两次评估的结果并找出不同的图片
+    different_images = []
+    for i in range(len(val_loader.dataset)):
+        if results[0][i] != results[1][i]:
+            different_images.append(val_loader.dataset[i])  # 假设数据集是一个包含图片的列表
+
+    # 将不同的图片显示到TensorBoard面板
+    for i, image in enumerate(different_images[:10]):
+        writer.add_image('Different Images', image, i)
 
     return top1.avg
 
