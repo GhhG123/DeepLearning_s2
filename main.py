@@ -8,6 +8,7 @@ from enum import Enum
 
 import torch
 import torch.backends.cudnn as cudnn
+import torch.backends.mps
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
@@ -411,9 +412,9 @@ def validate(val_loader, model, criterion, args):
                 i = base_progress + i
                 if args.gpu is not None and torch.cuda.is_available():
                     images = images.cuda(args.gpu, non_blocking=True)
-                # if torch.backends.mps.is_available():
-                # images = images.to('mps')
-                # target = target.to('mps')
+                if torch.backends.mps.is_available():
+                    images = images.to('mps')
+                    target = target.to('mps')
                  # move data to the same device as model
                 if torch.cuda.is_available():
                     target = target.cuda(args.gpu, non_blocking=True)
