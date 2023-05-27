@@ -8,7 +8,6 @@ from enum import Enum
 
 import torch
 import torch.backends.cudnn as cudnn
-import torch.backends.mps
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
@@ -321,6 +320,14 @@ def main_worker(gpu, ngpus_per_node, args):
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, device, args)
 
+        # 保存epoch=4、14
+        if args.evaluate and (epoch == 4 or epoch == 14):
+            state = {'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
+            # with open('/output/checkpoints/', 'r') as f:
+            #     print('create checkpoints successfully')
+            filename='/output/checkpoints/checkpoint_epoch'+str(epoch)+'.pth.tar'
+            torch.save(state, filename)
+
         # evaluate on validation set
         acc1 = validate(val_loader, model, criterion, args)
         
@@ -396,14 +403,6 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
             writer.add_scalar('Train/Acc@1', top1.avg, epoch * len(train_loader) + i)
             writer.add_scalar('Train/Acc@5', top5.avg, epoch * len(train_loader) + i)
         
-        # 保存epoch=4、14
-        if args.evaluate and (i == 4 or i == 14):
-            state = {'epoch': i, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
-            #save_checkpoint(state, is_best=True, 
-            with open('/output/checkpoints/', 'r') as f:
-                print('create checkpoints successfully')
-            filename='/output/checkpoints/checkpoint_epoch'+str(i)+'.pth.tar'
-            torch.save(state, filename)
 
 def validate(val_loader, model, criterion, args):
 
