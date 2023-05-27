@@ -305,27 +305,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
     if args.evaluate:
         validate(val_loader, model, criterion, args)
-        
-        # 加载保存的checkpoint进行评估
-        # checkpoint_paths = ['/output/checkpoints/checkpoint_epoch2.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
-        # results = []
-
-        # for checkpoint_path in checkpoint_paths:
-        #     checkpoint = torch.load(checkpoint_path)
-        #     model.load_state_dict(checkpoint['state_dict'])
-        #     # 在测试集上进行评估
-        #     result = validate(val_loader, model, criterion, args, writer)
-        #     results.append(result)
-
-        # # 对比两次评估的结果并找出不同的图片
-        # different_images = []
-        # for i in range(len(val_loader.dataset)):
-        #     if results[0][i] != results[1][i]:
-        #         different_images.append(val_loader.dataset[i])  # 假设数据集是一个包含图片的列表
-
-        # # 将不同的图片显示到TensorBoard面板
-        # for i, image in enumerate(different_images[:10]):
-        #     writer.add_image('Different Images', image, i)
             
         return
 
