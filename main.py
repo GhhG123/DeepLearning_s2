@@ -334,7 +334,7 @@ def main_worker(gpu, ngpus_per_node, args):
                     checkpoint = torch.load(checkpoint_path)
                     model.load_state_dict(checkpoint['state_dict'])
                     # 在测试集上进行评估
-                    result = validate(val_loader, model, criterion, args, writer)
+                    result = validate(val_loader, model, criterion, args)
                     results.append(result)
         
                     # 对比两次评估的结果并找出不同的图片
