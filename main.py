@@ -153,7 +153,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()
 
-    if not torch.cuda.is_available() and not torch.backends.mps.is_available():
+    if not torch.cuda.is_available():
         print('using CPU, this will be slow')
     elif args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -177,10 +177,10 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.gpu is not None and torch.cuda.is_available():
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-        model = model.to(device)
-        data = data.to(device)
+    # elif torch.backends.mps.is_available():
+    #     device = torch.device("mps")
+    #     model = model.to(device)
+    #     data = data.to(device)
     else:
         # DataParallel will divide and allocate batch_size to all available GPUs
         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
@@ -194,8 +194,8 @@ def main_worker(gpu, ngpus_per_node, args):
             device = torch.device('cuda:{}'.format(args.gpu))
         else:
             device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
+    # elif torch.backends.mps.is_available():
+    #     device = torch.device("mps")
     else:
         device = torch.device("cpu")
     # define loss function (criterion), optimizer, and learning rate scheduler
@@ -413,9 +413,9 @@ def validate(val_loader, model, criterion, args):
                 i = base_progress + i
                 if args.gpu is not None and torch.cuda.is_available():
                     images = images.cuda(args.gpu, non_blocking=True)
-                if torch.backends.mps.is_available():
-                    images = images.to('mps')
-                    target = target.to('mps')
+                # if torch.backends.mps.is_available():
+                #     images = images.to('mps')
+                #     target = target.to('mps')
                  # move data to the same device as model
                 if torch.cuda.is_available():
                     target = target.cuda(args.gpu, non_blocking=True)
@@ -528,8 +528,8 @@ class AverageMeter(object):
     def all_reduce(self):
         if torch.cuda.is_available():
             device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            device = torch.device("mps")
+        # elif torch.backends.mps.is_available():
+        #     device = torch.device("mps")
         else:
             device = torch.device("cpu")
         total = torch.tensor([self.sum, self.count], dtype=torch.float32, device=device)
