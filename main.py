@@ -400,6 +400,8 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
         if args.evaluate and (i == 4 or i == 14):
             state = {'epoch': i, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
             #save_checkpoint(state, is_best=True, 
+            with open('/output/checkpoints/', 'r') as f:
+                print('create checkpoints successfully')
             filename='/output/checkpoints/checkpoint_epoch'+str(i)+'.pth.tar'
             torch.save(state, filename)
 
