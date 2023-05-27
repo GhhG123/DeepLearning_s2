@@ -325,12 +325,12 @@ def main_worker(gpu, ngpus_per_node, args):
             state = {'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
             # with open('/output/checkpoints/', 'r') as f:
             #     print('create checkpoints successfully')
-            filename='/output/checkpoints/checkpoint_epoch'+str(epoch)+'.pth.tar'
+            filename='/output/checkpoint_epoch'+str(epoch)+'.pth.tar'
             torch.save(state, filename)
             if epoch == 14:
                 # 加载保存的checkpoint进行评估
                 if args.evaluate:
-                    checkpoint_paths = ['/output/checkpoints/checkpoint_epoch4.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
+                    checkpoint_paths = ['/output/checkpoint_epoch4.pth.tar', '/output/checkpoint_epoch14.pth.tar']
                     results = []
 
                 for checkpoint_path in checkpoint_paths:
