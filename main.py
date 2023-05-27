@@ -304,28 +304,28 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
     if args.evaluate:
-        # validate(val_loader, model, criterion, args)
+        validate(val_loader, model, criterion, args)
         
         # 加载保存的checkpoint进行评估
-        checkpoint_paths = ['/output/checkpoints/checkpoint_epoch2.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
-        results = []
+        # checkpoint_paths = ['/output/checkpoints/checkpoint_epoch2.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
+        # results = []
 
-        for checkpoint_path in checkpoint_paths:
-            checkpoint = torch.load(checkpoint_path)
-            model.load_state_dict(checkpoint['state_dict'])
-            # 在测试集上进行评估
-            result = validate(val_loader, model, criterion, args, writer)
-            results.append(result)
+        # for checkpoint_path in checkpoint_paths:
+        #     checkpoint = torch.load(checkpoint_path)
+        #     model.load_state_dict(checkpoint['state_dict'])
+        #     # 在测试集上进行评估
+        #     result = validate(val_loader, model, criterion, args, writer)
+        #     results.append(result)
 
-        # 对比两次评估的结果并找出不同的图片
-        different_images = []
-        for i in range(len(val_loader.dataset)):
-            if results[0][i] != results[1][i]:
-                different_images.append(val_loader.dataset[i])  # 假设数据集是一个包含图片的列表
+        # # 对比两次评估的结果并找出不同的图片
+        # different_images = []
+        # for i in range(len(val_loader.dataset)):
+        #     if results[0][i] != results[1][i]:
+        #         different_images.append(val_loader.dataset[i])  # 假设数据集是一个包含图片的列表
 
-        # 将不同的图片显示到TensorBoard面板
-        for i, image in enumerate(different_images[:10]):
-            writer.add_image('Different Images', image, i)
+        # # 将不同的图片显示到TensorBoard面板
+        # for i, image in enumerate(different_images[:10]):
+        #     writer.add_image('Different Images', image, i)
             
         return
 
@@ -346,27 +346,31 @@ def main_worker(gpu, ngpus_per_node, args):
             state = {'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
             filename='/output/checkpoints/checkpoint_epoch'+str(epoch)+'.pth.tar'
             torch.save(state, filename)
-            # if epoch == 14:
-            #     # 加载保存的checkpoint进行评估
-            #     checkpoint_paths = ['/output/checkpoints/checkpoint_epoch2.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
-            #     results = []
-
-            #     for checkpoint_path in checkpoint_paths:
-            #         checkpoint = torch.load(checkpoint_path)
-            #         model.load_state_dict(checkpoint['state_dict'])
-            #         # 在测试集上进行评估
-            #         result = validate(val_loader, model, criterion, args, writer)
-            #         results.append(result)
-
-            #     # 对比两次评估的结果并找出不同的图片
-            #     different_images = []
-            #     for i in range(len(val_loader.dataset)):
-            #         if results[0][i] != results[1][i]:
-            #             different_images.append(val_loader.dataset[i])  # 假设数据集是一个包含图片的列表
-
-            #     # 将不同的图片显示到TensorBoard面板
-            #     for i, image in enumerate(different_images[:10]):
-            #         writer.add_image('Different Images', image, i)
+            if epoch == 14:
+                # 加载保存的checkpoint进行评估
+                checkpoint_paths = ['/output/checkpoints/checkpoint_epoch2.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
+                results = []
+    
+                for checkpoint_path in checkpoint_paths:
+                    checkpoint = torch.load(checkpoint_path)
+                    model.load_state_dict(checkpoint['state_dict'])
+                    # 在测试集上进行评估
+                    result = validate(val_loader, model, criterion, args, writer)
+                    results.append(result)
+        
+                    # 对比两次评估的结果并找出不同的图片
+                    different_images = []
+                    a = 0
+                    for i in range(len(val_loader.dataset)):
+                        if results[0][i] != results[1][i]:
+                            different_images.append(val_loader.dataset[i],i)  # 假设数据集是一个包含图片的列表
+                            a=a+1
+                            if a==11: break
+        
+                    # 将不同的图片显示到TensorBoard面板
+                    for i, (image, image_id) in enumerate(different_images[:10]):
+                        writer.add_image('Different Images', image, i)
+                        writer.add_text('Different Images', 'checkpoint1', result[0][image_id], 'checkpoint2', result[1][image_id])
 
         # evaluate on validation set
         acc1 = validate(val_loader, model, criterion, args)
