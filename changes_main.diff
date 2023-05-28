@@ -1,0 +1,285 @@
+diff --git a/main.py b/main.py
+index 1f5be24..e828ea0 100644
+--- a/main.py
++++ b/main.py
+@@ -20,19 +20,13 @@ import torchvision.models as models
+ import torchvision.transforms as transforms
+ from torch.optim.lr_scheduler import StepLR
+ from torch.utils.data import Subset
+-from torch.utils.tensorboard import SummaryWriter # 导入tensorboard写入器
+-
+-# 根据项目组织目录改变以下值
+-path_tiny_imagenet_200 = '/data/bitahub/Tiny-imagenet-200/' #xxxx/xxxx/
+-# # 定义TensorBoard写入器
+-writer = SummaryWriter(log_dir='/output/logs')
+ 
+ model_names = sorted(name for name in models.__dict__
+     if name.islower() and not name.startswith("__")
+     and callable(models.__dict__[name]))
+ 
+ parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
+-parser.add_argument('data', metavar='DIR', nargs='?', default='/data/bitahub/Tiny-ImageNet',
++parser.add_argument('data', metavar='DIR', nargs='?', default='imagenet',
+                     help='path to dataset (default: imagenet)')
+ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
+                     choices=model_names,
+@@ -75,7 +69,7 @@ parser.add_argument('--dist-backend', default='nccl', type=str,
+                     help='distributed backend')
+ parser.add_argument('--seed', default=None, type=int,
+                     help='seed for initializing training. ')
+-parser.add_argument('--gpu', default=0, type=int,
++parser.add_argument('--gpu', default=None, type=int,
+                     help='GPU id to use.')
+ parser.add_argument('--multiprocessing-distributed', action='store_true',
+                     help='Use multi-processing distributed training to launch '
+@@ -146,14 +140,11 @@ def main_worker(gpu, ngpus_per_node, args):
+     if args.pretrained:
+         print("=> using pre-trained model '{}'".format(args.arch))
+         model = models.__dict__[args.arch](pretrained=True)
+-        # 修改最后一层的输出维度 
+-        num_features = model.fc.in_features
+-        model.fc = nn.Linear(num_features, 200)
+     else:
+         print("=> creating model '{}'".format(args.arch))
+         model = models.__dict__[args.arch]()
+ 
+-    if not torch.cuda.is_available():
++    if not torch.cuda.is_available() and not torch.backends.mps.is_available():
+         print('using CPU, this will be slow')
+     elif args.distributed:
+         # For multiprocessing distributed, DistributedDataParallel constructor
+@@ -177,10 +168,9 @@ def main_worker(gpu, ngpus_per_node, args):
+     elif args.gpu is not None and torch.cuda.is_available():
+         torch.cuda.set_device(args.gpu)
+         model = model.cuda(args.gpu)
+-    # elif torch.backends.mps.is_available():
+-    #     device = torch.device("mps")
+-    #     model = model.to(device)
+-    #     data = data.to(device)
++    elif torch.backends.mps.is_available():
++        device = torch.device("mps")
++        model = model.to(device)
+     else:
+         # DataParallel will divide and allocate batch_size to all available GPUs
+         if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
+@@ -194,8 +184,8 @@ def main_worker(gpu, ngpus_per_node, args):
+             device = torch.device('cuda:{}'.format(args.gpu))
+         else:
+             device = torch.device("cuda")
+-    # elif torch.backends.mps.is_available():
+-    #     device = torch.device("mps")
++    elif torch.backends.mps.is_available():
++        device = torch.device("mps")
+     else:
+         device = torch.device("cpu")
+     # define loss function (criterion), optimizer, and learning rate scheduler
+@@ -246,49 +236,21 @@ def main_worker(gpu, ngpus_per_node, args):
+         train_dataset = datasets.ImageFolder(
+             traindir,
+             transforms.Compose([
+-                # transforms.RandomResizedCrop(224),
+-                # transforms.RandomHorizontalFlip(),
++                transforms.RandomResizedCrop(224),
++                transforms.RandomHorizontalFlip(),
+                 transforms.ToTensor(),
+                 normalize,
+             ]))
+-        
+-        # 注意此段代码中的文件路径要与组合成项目后的路径符合，main.py与所要操作的文件的目录关系
+-        # 读取 wnids.txt 文件中的标签列表
+-        # with open(path_tiny_imagenet_200+'wnids.txt', 'r') as f:
+-        #     labels = [line.strip() for line in f.readlines()]
+-
+-        # # 读取 val_annotations.txt 文件中的标签信息
+-        # with open(path_tiny_imagenet_200+'val/val_annotations.txt', 'r') as f:
+-        #     val_annotations = [line.strip().split('\t') for line in f.readlines()]
+-
+-        # # 将每个样本的标签修正为对应标签在列表中的索引
+-        # corrected_annotations = []
+-        # for annotation in val_annotations:
+-        #     #print(annotation)
+-        #     filename, label = annotation[0], annotation[1]
+-        #     corrected_label = labels.index(label)
+-        #     corrected_annotations.append((filename, corrected_label, annotation[2], annotation[3], annotation[4], annotation[5]))
+-
+-        # # 将修正后的标签保存到新文件中
+-        # with open(path_tiny_imagenet_200+'val/val_annotations_new.txt', 'w') as f:
+-        #     for annotation in corrected_annotations:
+-        #         f.write('\t'.join([str(x) for x in annotation]) + '\n')
+-
+-        # # 更改修改后的文件的名称为原来文件的名称
+-        # os.rename(path_tiny_imagenet_200+'val/val_annotations.txt', path_tiny_imagenet_200+'val/val_annotations_original.txt')
+-        # os.rename(path_tiny_imagenet_200+'val/val_annotations_new.txt', path_tiny_imagenet_200+'val/val_annotations.txt')
+-        # print("=> val labels have already been right")
+ 
+         val_dataset = datasets.ImageFolder(
+             valdir,
+             transforms.Compose([
+-                # transforms.Resize(256),
+-                # transforms.CenterCrop(224),
++                transforms.Resize(256),
++                transforms.CenterCrop(224),
+                 transforms.ToTensor(),
+                 normalize,
+             ]))
+-        val_dataset.imgs = [(os.path.join(valdir, path), label) for path, label in val_dataset.imgs]
+-        
++
+     if args.distributed:
+         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+         val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False, drop_last=True)
+@@ -303,12 +265,9 @@ def main_worker(gpu, ngpus_per_node, args):
+     val_loader = torch.utils.data.DataLoader(
+         val_dataset, batch_size=args.batch_size, shuffle=False,
+         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
+-    ds = val_loader.dataset.imgs
+-    
++
+     if args.evaluate:
+-        # validate(val_loader, model, criterion, args)
+-        # 加载保存的checkpoint进行评估
+-        # 这里不做处理，在327行直接保存0、3个epoch的checkpoint,然后保存完第3个后评估对比
++        validate(val_loader, model, criterion, args)
+         return
+ 
+     for epoch in range(args.start_epoch, args.epochs):
+@@ -318,41 +277,9 @@ def main_worker(gpu, ngpus_per_node, args):
+         # train for one epoch
+         train(train_loader, model, criterion, optimizer, epoch, device, args)
+ 
+-        # 创建/checkpoints/文件夹（如果不存在）
+-        checkpoint_dir = '/output/checkpoints/'
+-        if not os.path.exists(checkpoint_dir):
+-            os.makedirs(checkpoint_dir)
+-        
+-        # 保存epoch=2、14。使用时总epoch设置为4，方便测试
+-        if args.evalute and (epoch == 0 or epoch == 3) :
+-            state = {'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
+-            filename='/output/checkpoints/checkpoint_epoch'+str(epoch)+'.pth.tar'
+-            torch.save(state, filename)
+-            if epoch == 3:
+-                # 加载保存的checkpoint进行评估
+-                checkpoint_paths = ['/output/checkpoints/checkpoint_epoch0.pth.tar', '/output/checkpoints/checkpoint_epoch3.pth.tar']
+-                checkpoint0 = torch.load(checkpoint_paths[0])  # 加载 checkpoint 文件
+-                model.load_state_dict(checkpoint0['state_dict'])  # 将权重加载到模型中
+-                resultcp1 = validate(val_loader, model, criterion, args)  # 使用加载的模型进行验证
+-                checkpoint3 = torch.load(checkpoint_paths[1])  # 加载 checkpoint 文件
+-                model.load_state_dict(checkpoint3['state_dict'])  # 将权重加载到模型中
+-                resultcp2 = validate(val_loader, model, criterion, args)  # 使用加载的模型进行验证
+-                
+-                a = 0
+-                # id相同的图片和预测的分类不同的情况下输出
+-                for i in range(len(resultcp1[1])):
+-                    if resultcp1[1][i] == resultcp2[1][i] and resultcp1[2][i] != resultcp2[2][i]:
+-                        a = a + 1
+-                        print('name: ', resultcp1[1][i], 'pred1: ', resultcp1[2][i], 'pred2: ', resultcp2[2][i])
+-                        #保存图片id和两个预测结果到txt文件中，路径为：’/output/diff_cp.txt‘
+-                        with open('/output/diff_cp.txt', 'a') as f:
+-                            f.write('name: '+resultcp1[1][i]+' pred1: '+str(resultcp1[2][i])+' pred2: '+str(resultcp2[2][i])+'\n')
+-                        if a==11: break
+-
+         # evaluate on validation set
+-        result_val = validate(val_loader, model, criterion, args)
+-        acc1 = result_val[0]
+-
++        acc1 = validate(val_loader, model, criterion, args)
++        
+         scheduler.step()
+         
+         # remember best acc@1 and save checkpoint
+@@ -385,9 +312,6 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
+     # switch to train mode
+     model.train()
+ 
+-     # 将模型添加到TensorBoard
+-    writer.add_graph(model, torch.zeros([1, 3, 64, 64]).to(device))
+-
+     end = time.time()
+     for i, (images, target) in enumerate(train_loader):
+         # measure data loading time
+@@ -419,18 +343,9 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
+         if i % args.print_freq == 0:
+             progress.display(i + 1)
+ 
+-        # 将训练集的Loss和精度写入TensorBoard
+-        if i % args.print_freq == 0:
+-            writer.add_scalar('Train/Loss', losses.avg, epoch * len(train_loader) + i)
+-            writer.add_scalar('Train/Acc@1', top1.avg, epoch * len(train_loader) + i)
+-            writer.add_scalar('Train/Acc@5', top5.avg, epoch * len(train_loader) + i)
+-        
+ 
+ def validate(val_loader, model, criterion, args):
+-    image_names = []  # 保存图片ID的列表
+-    predictions = []  # 保存预测结果的列表
+-    imgs_list = val_loader.dataset.imgs
+-    
++
+     def run_validate(loader, base_progress=0):
+         with torch.no_grad():
+             end = time.time()
+@@ -438,10 +353,9 @@ def validate(val_loader, model, criterion, args):
+                 i = base_progress + i
+                 if args.gpu is not None and torch.cuda.is_available():
+                     images = images.cuda(args.gpu, non_blocking=True)
+-                # if torch.backends.mps.is_available():
+-                #     images = images.to('mps')
+-                #     target = target.to('mps')
+-                 # move data to the same device as model
++                if torch.backends.mps.is_available():
++                    images = images.to('mps')
++                    target = target.to('mps')
+                 if torch.cuda.is_available():
+                     target = target.cuda(args.gpu, non_blocking=True)
+ 
+@@ -455,25 +369,12 @@ def validate(val_loader, model, criterion, args):
+                 top1.update(acc1[0], images.size(0))
+                 top5.update(acc5[0], images.size(0))
+ 
+-                # 将损失和准确率记录到 TensorBoard 中
+-                writer.add_scalar('val_loss', loss.item(), i)
+-                writer.add_scalar('val_acc1', acc1[0], i)
+-                writer.add_scalar('val_acc5', acc5[0], i)
+-                
+-                # 获取当前图像对应的路径和类别索引
+-                path_img, label = imgs_list[i]
+-                image_names.extend(path_img)
+-                # 获取当前图像的预测结果
+-                predictions.extend(output.argmax(dim=1).cpu().tolist())
+-
+-
+                 # measure elapsed time
+                 batch_time.update(time.time() - end)
+                 end = time.time()
+ 
+                 if i % args.print_freq == 0:
+                     progress.display(i + 1)
+-                
+ 
+     batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
+     losses = AverageMeter('Loss', ':.4e', Summary.NONE)
+@@ -502,8 +403,7 @@ def validate(val_loader, model, criterion, args):
+ 
+     progress.display_summary()
+ 
+-
+-    return [top1.avg, image_names, predictions]     #改有需要此函数的返回值的地方
++    return top1.avg
+ 
+ 
+ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+@@ -540,8 +440,8 @@ class AverageMeter(object):
+     def all_reduce(self):
+         if torch.cuda.is_available():
+             device = torch.device("cuda")
+-        # elif torch.backends.mps.is_available():
+-        #     device = torch.device("mps")
++        elif torch.backends.mps.is_available():
++            device = torch.device("mps")
+         else:
+             device = torch.device("cpu")
+         total = torch.tensor([self.sum, self.count], dtype=torch.float32, device=device)
+@@ -609,4 +509,3 @@ def accuracy(output, target, topk=(1,)):
+ 
+ if __name__ == '__main__':
+     main()
+-    writer.close()
