@@ -1,0 +1,20 @@
+diff --git a/train.py b/train.py
+index 75bcd82..6d972c7 100644
+--- a/train.py
++++ b/train.py
+@@ -5,8 +5,10 @@ a.shape
+ print(a.sum(axis=1,keepdims=True).shape)
+ a.sum(axis=1).shape
+ 
+-a.sum(axis=[0,1])
+ 
+ # Path: train.py
+-a = 1
+-b = 3
+\ No newline at end of file
++
++b = 3
++
++
++print("hello world")
+\ No newline at end of file

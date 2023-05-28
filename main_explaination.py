@@ -1,3 +1,5 @@
+#此文档附加中文注释以便理解，注释由chatGPT生成
+
 import argparse  # 导入解析命令行参数的模块
 import os  # 导入操作系统路径的模块
 import random  # 导入随机数生成的模块
