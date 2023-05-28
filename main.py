@@ -287,7 +287,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 transforms.ToTensor(),
                 normalize,
             ]))
-
+        val_dataset.imgs = [(os.path.join(valdir, path), label) for path, label in val_dataset.imgs]
+        
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
         val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False, drop_last=True)
@@ -302,10 +303,12 @@ def main_worker(gpu, ngpus_per_node, args):
     val_loader = torch.utils.data.DataLoader(
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
-
+    ds = val_loader.dataset.imgs
+    
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
-            
+        # validate(val_loader, model, criterion, args)
+        # 加载保存的checkpoint进行评估
+        # 这里不做处理，在327行直接保存0、3个epoch的checkpoint,然后保存完第3个后评估对比
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -320,40 +323,36 @@ def main_worker(gpu, ngpus_per_node, args):
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
         
-        # 保存epoch=2、14
-        if epoch == 2 or epoch == 14:
+        # 保存epoch=2、14。使用时总epoch设置为4，方便测试
+        if args.evalute and (epoch == 0 or epoch == 3) :
             state = {'epoch': epoch, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
             filename='/output/checkpoints/checkpoint_epoch'+str(epoch)+'.pth.tar'
             torch.save(state, filename)
-            if epoch == 14:
+            if epoch == 3:
                 # 加载保存的checkpoint进行评估
-                checkpoint_paths = ['/output/checkpoints/checkpoint_epoch2.pth.tar', '/output/checkpoints/checkpoint_epoch14.pth.tar']
-                results = []
-    
-                for checkpoint_path in checkpoint_paths:
-                    checkpoint = torch.load(checkpoint_path)
-                    model.load_state_dict(checkpoint['state_dict'])
-                    # 在测试集上进行评估
-                    result = validate(val_loader, model, criterion, args)
-                    results.append(result)
-        
-                    # 对比两次评估的结果并找出不同的图片
-                    different_images = []
-                    a = 0
-                    for i in range(len(val_loader.dataset)):
-                        if results[0][i] != results[1][i]:
-                            different_images.append(val_loader.dataset[i],i)  # 假设数据集是一个包含图片的列表
-                            a=a+1
-                            if a==11: break
-        
-                    # 将不同的图片显示到TensorBoard面板
-                    for i, (image, image_id) in enumerate(different_images[:10]):
-                        writer.add_image('Different Images', image, i)
-                        writer.add_text('Different Images', 'checkpoint1', result[0][image_id], 'checkpoint2', result[1][image_id])
+                checkpoint_paths = ['/output/checkpoints/checkpoint_epoch0.pth.tar', '/output/checkpoints/checkpoint_epoch3.pth.tar']
+                checkpoint0 = torch.load(checkpoint_paths[0])  # 加载 checkpoint 文件
+                model.load_state_dict(checkpoint0['state_dict'])  # 将权重加载到模型中
+                resultcp1 = validate(val_loader, model, criterion, args)  # 使用加载的模型进行验证
+                checkpoint3 = torch.load(checkpoint_paths[1])  # 加载 checkpoint 文件
+                model.load_state_dict(checkpoint3['state_dict'])  # 将权重加载到模型中
+                resultcp2 = validate(val_loader, model, criterion, args)  # 使用加载的模型进行验证
+                
+                a = 0
+                # id相同的图片和预测的分类不同的情况下输出
+                for i in range(len(resultcp1[1])):
+                    if resultcp1[1][i] == resultcp2[1][i] and resultcp1[2][i] != resultcp2[2][i]:
+                        a = a + 1
+                        print('name: ', resultcp1[1][i], 'pred1: ', resultcp1[2][i], 'pred2: ', resultcp2[2][i])
+                        #保存图片id和两个预测结果到txt文件中，路径为：’/output/diff_cp.txt‘
+                        with open('/output/diff_cp.txt', 'a') as f:
+                            f.write('name: '+resultcp1[1][i]+' pred1: '+str(resultcp1[2][i])+' pred2: '+str(resultcp2[2][i])+'\n')
+                        if a==11: break
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
-        
+        result_val = validate(val_loader, model, criterion, args)
+        acc1 = result_val[0]
+
         scheduler.step()
         
         # remember best acc@1 and save checkpoint
@@ -428,6 +427,9 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
         
 
 def validate(val_loader, model, criterion, args):
+    image_names = []  # 保存图片ID的列表
+    predictions = []  # 保存预测结果的列表
+    imgs_list = val_loader.dataset.imgs
     
     def run_validate(loader, base_progress=0):
         with torch.no_grad():
@@ -457,6 +459,13 @@ def validate(val_loader, model, criterion, args):
                 writer.add_scalar('val_loss', loss.item(), i)
                 writer.add_scalar('val_acc1', acc1[0], i)
                 writer.add_scalar('val_acc5', acc5[0], i)
+                
+                # 获取当前图像对应的路径和类别索引
+                path_img, label = imgs_list[i]
+                image_names.extend(path_img)
+                # 获取当前图像的预测结果
+                predictions.extend(output.argmax(dim=1).cpu().tolist())
+
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
@@ -464,6 +473,7 @@ def validate(val_loader, model, criterion, args):
 
                 if i % args.print_freq == 0:
                     progress.display(i + 1)
+                
 
     batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
     losses = AverageMeter('Loss', ':.4e', Summary.NONE)
@@ -493,7 +503,7 @@ def validate(val_loader, model, criterion, args):
     progress.display_summary()
 
 
-    return top1.avg
+    return [top1.avg, image_names, predictions]     #改有需要此函数的返回值的地方
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
